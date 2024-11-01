@@ -4,6 +4,8 @@
 #include <string>
 #include <regex>
 #include <algorithm>
+#include <functional>
+#include <chrono>
 
 
 #define MY_INPUT_PATH R"(..\inputDay3.txt)"
@@ -41,8 +43,8 @@ int solutionPart1(const char* inputPath) {
             partNumbers.push_back({
                 std::stoi(sm.str()),
                 static_cast<int>(engineSchematic.size()),
-                prevPosition + sm.position(),
-                prevPosition + sm.position() + sm.length() - 1
+                static_cast<int>(prevPosition + sm.position()),
+                static_cast<int>(prevPosition + sm.position() + sm.length() - 1)
             });
 
             prevPosition += sm.position() + sm.length();
@@ -62,7 +64,7 @@ int solutionPart1(const char* inputPath) {
 
         int prevPosition = 0;
         while (std::regex_search(mutableLine, sm, exp)) {
-            int symbolColumn{ prevPosition + sm.position() };
+            int symbolColumn{ static_cast<int>(prevPosition + sm.position()) };
 
             std::vector<PartNumber>::iterator it;
             while (
@@ -101,8 +103,8 @@ int solutionPart2(const char* inputPath) {
             partNumbers.push_back({
                 std::stoi(sm.str()),
                 static_cast<int>(engineSchematic.size()),
-                prevPosition + sm.position(),
-                prevPosition + sm.position() + sm.length() - 1
+                static_cast<int>(prevPosition + sm.position()),
+                static_cast<int>(prevPosition + sm.position() + sm.length() - 1)
             });
 
             prevPosition += sm.position() + sm.length();
@@ -122,7 +124,7 @@ int solutionPart2(const char* inputPath) {
 
         int prevPosition = 0;
         while (std::regex_search(mutableLine, sm, exp)) {
-            int symbolColumn{ prevPosition + sm.position() }, ratio{ 1 };
+            int symbolColumn{ static_cast<int>(prevPosition + sm.position()) }, ratio{ 1 };
 
             if (
                 std::count_if(partNumbers.begin(), partNumbers.end(),
@@ -148,6 +150,17 @@ int solutionPart2(const char* inputPath) {
 }
 
 
+double measureTime(const std::function<void()>& func, int numOfRuns) {
+    auto startTime = std::chrono::steady_clock::now();
+    for (int i{}; i < numOfRuns; i++) {
+        func();
+    }
+    auto endTime = std::chrono::steady_clock::now();
+
+    return std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() / (double)numOfRuns;
+}
+
+
 int main() {
     std::cout << "Test inputs:" << std::endl;
     std::cout << "\tPart 1: " << solutionPart1(TEST_INPUT_PART1_PATH) << std::endl;
@@ -155,6 +168,9 @@ int main() {
     std::cout << "My input:" << std::endl;
     std::cout << "\tPart 1: " << solutionPart1(MY_INPUT_PATH) << std::endl;
     std::cout << "\tPart 2: " << solutionPart2(MY_INPUT_PATH) << std::endl;
+    std::cout << "My input runtime [ms]:" << std::endl;
+    std::cout << "\tPart 1: " << measureTime([](){ solutionPart1(MY_INPUT_PATH); }, 1000) << std::endl;
+    std::cout << "\tPart 2: " << measureTime([](){ solutionPart2(MY_INPUT_PATH); }, 1000) << std::endl;
 
     return 0;
 }

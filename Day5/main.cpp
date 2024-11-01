@@ -3,6 +3,9 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <algorithm>
+#include <functional>
+#include <chrono>
 
 
 #define MY_INPUT_PATH R"(..\inputDay5.txt)"
@@ -170,6 +173,17 @@ long long solutionPart2(const char* inputPath) {
 }
 
 
+double measureTime(const std::function<void()>& func, int numOfRuns) {
+    auto startTime = std::chrono::steady_clock::now();
+    for (int i{}; i < numOfRuns; i++) {
+        func();
+    }
+    auto endTime = std::chrono::steady_clock::now();
+
+    return std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() / (double)numOfRuns;
+}
+
+
 int main() {
     std::cout << "Test inputs:" << std::endl;
     std::cout << "\tPart 1: " << solutionPart1(TEST_INPUT_PART1_PATH) << std::endl;
@@ -177,6 +191,9 @@ int main() {
     std::cout << "My input:" << std::endl;
     std::cout << "\tPart 1: " << solutionPart1(MY_INPUT_PATH) << std::endl;
     std::cout << "\tPart 2: " << solutionPart2(MY_INPUT_PATH) << std::endl;
+    std::cout << "My input runtime [ms]:" << std::endl;
+    std::cout << "\tPart 1: " << measureTime([](){ solutionPart1(MY_INPUT_PATH); }, 1000) << std::endl;
+    std::cout << "\tPart 2: " << measureTime([](){ solutionPart2(MY_INPUT_PATH); }, 1000) << std::endl;
 
     return 0;
 }
