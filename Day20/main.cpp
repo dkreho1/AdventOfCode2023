@@ -7,6 +7,8 @@
 #include <sstream>
 #include <queue>
 #include <algorithm>
+#include <utility>
+#include <numeric>
 
 
 #define MY_INPUT_PATH R"(..\inputDay20.txt)"
@@ -61,12 +63,13 @@ protected:
     static std::map<std::string, std::shared_ptr<Module>> moduleNetwork;
     static std::queue<std::function<void()>> pulseQueue;
     static std::map<bool, long long> numOfPulses;
-
+    static std::pair<std::string, bool> lastActiveModule;
 };
 
 std::map<std::string, std::shared_ptr<Module>> Module::moduleNetwork;
 std::queue<std::function<void()>> Module::pulseQueue;
 std::map<bool, long long> Module::numOfPulses;
+std::pair<std::string, bool> Module::lastActiveModule;
 
 class FlipFlipModule final : public Module {
 public:
@@ -78,6 +81,9 @@ public:
         }
 
         state = !state;
+
+        lastActiveModule = std::make_pair(this->name, state);
+
         for (const std::string& outputModule : outputModules) {
             numOfPulses[state]++;
             if (moduleNetwork.contains(outputModule)) {
@@ -109,9 +115,7 @@ public:
             output = output || !mem.second;
         }
 
-        if (name == "ts" && output) {
-            std::cout << "Ovdje" << std::endl;
-        }
+        lastActiveModule = std::make_pair(this->name, output);
 
         for (const std::string& outputModule : outputModules) {
             numOfPulses[output]++;
@@ -150,6 +154,8 @@ public:
     BroadcastModule(const std::string& name) : Module{ name } {}
 
     void processInputs(const std::string& module, bool pulse) override {
+        lastActiveModule = std::make_pair(this->name, pulse);
+
         for (const std::string& outputModule : outputModules) {
             numOfPulses[pulse]++;
             if (moduleNetwork.contains(outputModule)) {
@@ -170,18 +176,39 @@ public:
         const std::string& broadcaster
     ) : name{ name }, broadcaster{ broadcaster } {}
 
-    void push() {
+    std::map<std::string, int> push(std::vector<std::string> trackModules = {}) {
+        std::map<std::string, int> trackedNumOfPushes;
+
+        numOfPushes++;
+        Module::lastActiveModule = std::make_pair(name, false);
         Module::numOfPulses[false]++;
         Module::moduleNetwork.at(broadcaster)->processInputs(name, false);
         while (!Module::pulseQueue.empty()) {
             Module::pulseQueue.front()();
+
+            if (auto found {
+                    std::find(
+                        trackModules.begin(),
+                        trackModules.end(),
+                        Module::lastActiveModule.first
+                    )
+                }; found != trackModules.end() &&  Module::lastActiveModule.second) {
+
+                if (!trackedNumOfPushes.contains( Module::lastActiveModule.first)) {
+                    trackedNumOfPushes[Module::lastActiveModule.first] = numOfPushes;
+                }
+            }
+
             Module::pulseQueue.pop();
         }
+
+        return trackedNumOfPushes;
     }
 
 private:
     std::string broadcaster;
     std::string name;
+    int numOfPushes{};
 };
 
 
@@ -245,7 +272,79 @@ long long solutionPart1(const char* inputPath) {
 long long solutionPart2(const char* inputPath) {
     std::ifstream input(inputPath);
 
-    return 0;
+    Module::clearNetwork();
+
+    for (std::string line; std::getline(input, line); ) {
+        std::stringstream ss(line);
+
+        std::string nameAndType, arrow;
+        ss >> nameAndType >> arrow;
+
+        std::string name, type;
+        if (nameAndType.front() == '&' | nameAndType.front() == '%') {
+            type = nameAndType.front();
+            nameAndType.erase(nameAndType.begin());
+        }
+        name = nameAndType;
+
+        std::vector<std::string> outputModules;
+        for (std::string outputModule; ss >> outputModule; ) {
+            if (outputModule.back() == ',') {
+                outputModule.erase(outputModule.end() - 1);
+            }
+
+            outputModules.push_back(outputModule);
+        }
+
+        std::shared_ptr<Module> module;
+        if (type == "%") {
+            module = std::make_shared<FlipFlipModule>(name);
+            Module::addModuleToNetwork(name, module);
+        } else if (type == "&") {
+            module = std::make_shared<ConjunctionModule>(name);
+            Module::addModuleToNetwork(name, module);
+        } else {
+            module = std::make_shared<BroadcastModule>(name);
+            Module::addModuleToNetwork(name, module);
+        }
+
+        for (auto&& outputModule : outputModules) {
+            module->addOutput(outputModule);
+        }
+    }
+
+    ConjunctionModule::allocateMemorySlots();
+
+    ButtonModule button("button", "broadcaster");
+
+    std::vector<std::string> trackModules{ "js", "qs", "dt", "ts" };
+    std::vector<int> numOfPushes;
+
+    while (!trackModules.empty()) {
+        std::map<std::string, int> trackedNumOfPushes{ button.push(trackModules) };
+
+        for (auto&& num : trackedNumOfPushes) {
+            if (auto found{
+                    std::find(
+                        trackModules.begin(),
+                        trackModules.end(),
+                        num.first
+                    )
+                }; found != trackModules.end()) {
+
+                numOfPushes.push_back(num.second);
+                trackModules.erase(found);
+            }
+        }
+    }
+
+    long long numOfPushesUntilRx{ 1 };
+
+    for (auto&& n : numOfPushes) {
+        numOfPushesUntilRx = std::lcm(numOfPushesUntilRx, n);
+    }
+
+    return numOfPushesUntilRx;
 }
 
 
@@ -262,14 +361,14 @@ double measureTime(const std::function<void()>& func, int numOfRuns) {
 
 int main() {
     std::cout << "Test inputs:" << std::endl;
-//    std::cout << "\tInput 1 Part 1: " << solutionPart1(TEST_INPUT1_PART1_PATH) << std::endl;
-//    std::cout << "\tInput 2 Part 1: " << solutionPart1(TEST_INPUT2_PART1_PATH) << std::endl;
-//    std::cout << "My input:" << std::endl;
-//    std::cout << "\tPart 1: " << solutionPart1(MY_INPUT_PATH) << std::endl;
+    std::cout << "\tInput 1 Part 1: " << solutionPart1(TEST_INPUT1_PART1_PATH) << std::endl;
+    std::cout << "\tInput 2 Part 1: " << solutionPart1(TEST_INPUT2_PART1_PATH) << std::endl;
+    std::cout << "My input:" << std::endl;
+    std::cout << "\tPart 1: " << solutionPart1(MY_INPUT_PATH) << std::endl;
     std::cout << "\tPart 2: " << solutionPart2(MY_INPUT_PATH) << std::endl;
-//    std::cout << "My input runtime [ms]:" << std::endl;
-//    std::cout << "\tPart 1: " << measureTime([](){ solutionPart1(MY_INPUT_PATH); }, 1000) << std::endl;
-//    std::cout << "\tPart 2: " << measureTime([](){ solutionPart2(MY_INPUT_PATH); }, 1000) << std::endl;
+    std::cout << "My input runtime [ms]:" << std::endl;
+    std::cout << "\tPart 1: " << measureTime([](){ solutionPart1(MY_INPUT_PATH); }, 1000) << std::endl;
+    std::cout << "\tPart 2: " << measureTime([](){ solutionPart2(MY_INPUT_PATH); }, 1000) << std::endl;
 
     return 0;
 }
