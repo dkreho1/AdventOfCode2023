@@ -29,8 +29,8 @@ public:
     }
 
     static void addModuleToNetwork(
-        const std::string& name,
-        const std::shared_ptr<Module>& module
+            const std::string& name,
+            const std::shared_ptr<Module>& module
     ) {
         moduleNetwork[name] = module;
     }
@@ -39,9 +39,9 @@ public:
 
     bool containsOutputModule(const std::string& outputModule) {
         return std::find(
-            outputModules.begin(),
-            outputModules.end(),
-            outputModule
+                outputModules.begin(),
+                outputModules.end(),
+                outputModule
         ) != outputModules.end();
     }
 
@@ -55,6 +55,10 @@ public:
 
     static std::map<bool, long long> getPulseCount() {
         return numOfPulses;
+    }
+
+    static std::map<std::string, std::shared_ptr<Module>>& getModuleNetwork() {
+        return moduleNetwork;
     }
 
 protected:
@@ -172,8 +176,8 @@ public:
 class ButtonModule final {
 public:
     ButtonModule(
-        const std::string& name,
-        const std::string& broadcaster
+            const std::string& name,
+            const std::string& broadcaster
     ) : name{ name }, broadcaster{ broadcaster } {}
 
     std::map<std::string, int> push(std::vector<std::string> trackModules = {}) {
@@ -192,7 +196,8 @@ public:
                         trackModules.end(),
                         Module::lastActiveModule.first
                     )
-                }; found != trackModules.end() &&  Module::lastActiveModule.second) {
+                }; found != trackModules.end() &&  Module::lastActiveModule.second
+            ) {
 
                 if (!trackedNumOfPushes.contains( Module::lastActiveModule.first)) {
                     trackedNumOfPushes[Module::lastActiveModule.first] = numOfPushes;
@@ -317,7 +322,18 @@ long long solutionPart2(const char* inputPath) {
 
     ButtonModule button("button", "broadcaster");
 
-    std::vector<std::string> trackModules{ "js", "qs", "dt", "ts" };
+    std::vector<std::string> trackModules;
+    auto&& moduleNetwork{ Module::getModuleNetwork() };
+    for (auto&& moduleWithRxOutput : moduleNetwork) {
+        if (moduleWithRxOutput.second->containsOutputModule("rx")) {
+            for (auto&& module : moduleNetwork) {
+                if (module.second->containsOutputModule(moduleWithRxOutput.first)) {
+                    trackModules.push_back(module.first);
+                }
+            }
+        }
+    }
+
     std::vector<int> numOfPushes;
 
     while (!trackModules.empty()) {
@@ -330,7 +346,8 @@ long long solutionPart2(const char* inputPath) {
                         trackModules.end(),
                         num.first
                     )
-                }; found != trackModules.end()) {
+                }; found != trackModules.end()
+            ) {
 
                 numOfPushes.push_back(num.second);
                 trackModules.erase(found);
