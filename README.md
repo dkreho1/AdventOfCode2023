@@ -26,3 +26,4 @@ My [Advent of Code 2023](https://adventofcode.com/2023) solutions in the C++ pro
 |Day 18|[Problem](https://adventofcode.com/2023/day/18)|[Solution](Day18/main.cpp)|0.229|0.409|
 |Day 19|[Problem](https://adventofcode.com/2023/day/19)|[Solution](Day19/main.cpp)|77.63|81.77|
 |Day 20|[Problem](https://adventofcode.com/2023/day/20)|[Solution](Day20/main.cpp)|16.73|54.837|
+|Day 21|[Problem](https://adventofcode.com/2023/day/21)|[Solution](Day21/main.cpp)|27.723||
