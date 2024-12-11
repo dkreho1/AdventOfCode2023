@@ -6,6 +6,7 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <thread>
 
 
 #define MY_INPUT_PATH R"(..\inputDay22.txt)"
@@ -97,10 +98,10 @@ int solutionPart1(const char* inputPath) {
         bricks.at(i).updateMinMaxZ();
     }
 
-    int numOfSafeToDisintegrated{};
+    int numOfSafeToDisintegrate{};
 
     for (auto brickIt{ bricks.begin() }; brickIt != bricks.end(); ++brickIt) {
-        bool safeToDisintegrated{ true };
+        bool safeToDisintegrate{ true };
         for (auto otherBrickIt{ brickIt + 1 }; otherBrickIt != bricks.end(); ++otherBrickIt) {
             if (
                 otherBrickIt->minZ == brickIt->maxZ + 1 &&
@@ -119,23 +120,148 @@ int solutionPart1(const char* inputPath) {
                 }
 
                 if (!supportBrickFound) {
-                    safeToDisintegrated = false;
+                    safeToDisintegrate = false;
                     break;
                 }
             }
         }
 
-        numOfSafeToDisintegrated += safeToDisintegrated;
+        numOfSafeToDisintegrate += safeToDisintegrate;
     }
 
-    return numOfSafeToDisintegrated;
+    return numOfSafeToDisintegrate;
 }
 
 
 int solutionPart2(const char* inputPath) {
     std::ifstream input(inputPath);
 
-    return 0;
+    std::vector<Brick> bricks;
+    for (std::string line; std::getline(input, line); ) {
+        std::stringstream ss(line);
+
+        int x, y, z;
+        char commaOrTilda;
+
+        ss >> x >> commaOrTilda >> y >> commaOrTilda >> z >> commaOrTilda;
+        Position3D corner1{x, y, z};
+
+        ss >> x >> commaOrTilda >> y >> commaOrTilda >> z;
+        Position3D corner2{x, y, z};
+
+        bricks.emplace_back(corner1, corner2);
+    }
+
+    std::sort(
+        bricks.begin(),
+        bricks.end(),
+        [](const Brick& brick1, const Brick& brick2) {
+            return std::min(brick1.corner1.z, brick1.corner2.z) <
+                   std::min(brick2.corner1.z, brick2.corner2.z);
+        }
+    );
+
+    for (int i{}; i < bricks.size(); ++i) {
+        if (i == 0) {
+            if (bricks.at(i).minZ != 1) {
+                bricks.at(i).corner1.z += -bricks.at(i).minZ + 1;
+                bricks.at(i).corner2.z += -bricks.at(i).minZ + 1;
+                bricks.at(i).updateMinMaxZ();
+            }
+
+            continue;
+        }
+
+        int maxZ{};
+        for (int j{}; j < i; ++j) {
+            if (
+                bricks.at(i).isOverlappingXY(bricks.at(j)) &&
+                bricks.at(j).maxZ > maxZ
+            ) {
+                maxZ = bricks.at(j).maxZ;
+            }
+        }
+
+        bricks.at(i).corner1.z += -bricks.at(i).minZ + 1 + maxZ;
+        bricks.at(i).corner2.z += -bricks.at(i).minZ + 1 + maxZ;
+        bricks.at(i).updateMinMaxZ();
+    }
+
+    std::vector<int> unsafeToDisintegrateBricksIdx;
+    for (auto brickIt{ bricks.begin() }; brickIt != bricks.end(); ++brickIt) {
+        bool safeToDisintegrate{ true };
+        for (auto otherBrickIt{ brickIt + 1 }; otherBrickIt != bricks.end(); ++otherBrickIt) {
+            if (
+                otherBrickIt->minZ == brickIt->maxZ + 1 &&
+                brickIt->isOverlappingXY(*otherBrickIt)
+            ) {
+                bool supportBrickFound{ false };
+                for (auto supportBrick{ bricks.begin() }; supportBrick != bricks.end(); ++supportBrick) {
+                    if (
+                        brickIt != supportBrick &&
+                        brickIt->maxZ == supportBrick->maxZ &&
+                        supportBrick->isOverlappingXY(*otherBrickIt)
+                    ) {
+                        supportBrickFound = true;
+                        break;
+                    }
+                }
+
+                if (!supportBrickFound) {
+                    safeToDisintegrate = false;
+                    break;
+                }
+            }
+        }
+
+        if (!safeToDisintegrate) {
+            unsafeToDisintegrateBricksIdx.push_back(brickIt - bricks.begin());
+        }
+    }
+
+    std::atomic<int> numOfFallingBricks{};
+    std::vector<std::thread> threads;
+    for (int brickIdx : unsafeToDisintegrateBricksIdx) {
+        threads.emplace_back(
+            [&bricks, brickIdx, &numOfFallingBricks]() -> void {
+                std::vector<Brick> fallingBricks{ bricks };
+                fallingBricks.erase(fallingBricks.begin() + brickIdx);
+                for (int i{}; i < fallingBricks.size(); ++i) {
+                    if (i == 0) {
+                        if (fallingBricks.at(i).minZ != 1) {
+                            fallingBricks.at(i).corner1.z += -fallingBricks.at(i).minZ + 1;
+                            fallingBricks.at(i).corner2.z += -fallingBricks.at(i).minZ + 1;
+                            fallingBricks.at(i).updateMinMaxZ();
+                            numOfFallingBricks++;
+                        }
+
+                        continue;
+                    }
+
+                    int maxZ{};
+                    for (int j{}; j < i; ++j) {
+                        if (
+                            fallingBricks.at(i).isOverlappingXY(fallingBricks.at(j)) &&
+                            fallingBricks.at(j).maxZ > maxZ
+                        ) {
+                            maxZ = fallingBricks.at(j).maxZ;
+                        }
+                    }
+
+                    numOfFallingBricks += (-fallingBricks.at(i).minZ + 1 + maxZ) != 0;
+                    fallingBricks.at(i).corner1.z += -fallingBricks.at(i).minZ + 1 + maxZ;
+                    fallingBricks.at(i).corner2.z += -fallingBricks.at(i).minZ + 1 + maxZ;
+                    fallingBricks.at(i).updateMinMaxZ();
+                }
+            }
+        );
+    }
+
+    for (auto&& th : threads) {
+        th.join();
+    }
+
+    return numOfFallingBricks;
 }
 
 
@@ -153,13 +279,13 @@ double measureTime(const std::function<void()>& func, int numOfRuns) {
 int main() {
     std::cout << "Test inputs:" << std::endl;
     std::cout << "\tPart 1: " << solutionPart1(TEST_INPUT_PART1_PATH) << std::endl;
-//    std::cout << "\tPart 2: " << solutionPart2(TEST_INPUT_PART2_PATH) << std::endl;
+    std::cout << "\tPart 2: " << solutionPart2(TEST_INPUT_PART2_PATH) << std::endl;
     std::cout << "My input:" << std::endl;
     std::cout << "\tPart 1: " << solutionPart1(MY_INPUT_PATH) << std::endl;
-//    std::cout << "\tPart 2: " << solutionPart2(MY_INPUT_PATH) << std::endl;
+    std::cout << "\tPart 2: " << solutionPart2(MY_INPUT_PATH) << std::endl;
     std::cout << "My input runtime [ms]:" << std::endl;
     std::cout << "\tPart 1: " << measureTime([](){ solutionPart1(MY_INPUT_PATH); }, 1000) << std::endl;
-//    std::cout << "\tPart 2: " << measureTime([](){ solutionPart2(MY_INPUT_PATH); }, 1000) << std::endl;
+    std::cout << "\tPart 2: " << measureTime([](){ solutionPart2(MY_INPUT_PATH); }, 100) << std::endl;
 
     return 0;
 }
